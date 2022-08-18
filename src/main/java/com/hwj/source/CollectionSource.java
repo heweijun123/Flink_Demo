@@ -1,7 +1,6 @@
 package com.hwj.source;
 
 import com.hwj.entity.SensorReading;
-import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

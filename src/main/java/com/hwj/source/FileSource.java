@@ -1,8 +1,5 @@
 package com.hwj.source;
 
-import com.hwj.entity.SensorReading;
-import com.hwj.wordcount.BatchWordCount;
-import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -25,7 +22,7 @@ public class FileSource {
         env.setParallelism(1);
 
         // 从文件中获取数据输出
-        String path = BatchWordCount.class.getClassLoader().getResource("").getPath();
+        String path = FileSource.class.getClassLoader().getResource("").getPath();
         String filePath = path + "sensor.txt";
         DataStreamSource<String> dataStreamSource = env.readTextFile(filePath);
 
