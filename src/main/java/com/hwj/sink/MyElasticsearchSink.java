@@ -2,21 +2,36 @@ package com.hwj.sink;
 
 import com.hwj.entity.SensorReading;
 import com.hwj.source.FileSource;
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.connectors.elasticsearch.ElasticsearchSinkBase;
+import org.apache.flink.streaming.connectors.elasticsearch.ElasticsearchSinkFunction;
+import org.apache.flink.streaming.connectors.elasticsearch.RequestIndexer;
+import org.apache.flink.streaming.connectors.elasticsearch.table.Elasticsearch7DynamicSinkFactory;
 import org.apache.flink.streaming.connectors.elasticsearch7.ElasticsearchSink;
 import org.apache.flink.streaming.connectors.redis.RedisSink;
+import org.apache.http.HttpHost;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.elasticsearch.action.index.IndexRequest;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @Author: hwj
  * @CreateTime: 2022-08-18  15:34
  * @Version: 1.0
- * @Description: Sink输出到ES
+ * @Description: Sink输出到ES（设置了用户密码鉴权）
  */
 public class MyElasticsearchSink {
 
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) throws Exception {
 
         //创建执行环境
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -36,9 +51,41 @@ public class MyElasticsearchSink {
         });
 
         //输出到Elasticsearch
-        new ElasticsearchSink.Builder()
-        dataStream.addSink();
+        List<HttpHost> httpHosts = new ArrayList<>();
+        httpHosts.add(new HttpHost("hwjaliyun", 9200));
+        //设置用户密码
+        ElasticsearchSink.Builder esSinkBuilder = new ElasticsearchSink.Builder(httpHosts, new MyElasticsearchSinkFunction());
+        esSinkBuilder.setRestClientFactory(restClientBuilder ->
 
+                restClientBuilder.setHttpClientConfigCallback(httpClientBuilder -> {
+
+                    CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+                    credentialsProvider.setCredentials(AuthScope.ANY,
+                            new UsernamePasswordCredentials("elastic", "hwjaliyunesmm"));
+                    return httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider);
+                }));
+        ElasticsearchSink elasticsearchSink = esSinkBuilder.build();
+        esSinkBuilder.setBulkFlushMaxActions(1);
+
+        //输出到ES
+        dataStream.addSink(elasticsearchSink);
+        //执行
         env.execute();
+    }
+
+    public static class MyElasticsearchSinkFunction implements ElasticsearchSinkFunction<SensorReading> {
+
+
+        @Override
+        public void process(SensorReading sensorReading, RuntimeContext runtimeContext, RequestIndexer requestIndexer) {
+
+            Map<String, String> map = new HashMap<>();
+            map.put("id", sensorReading.getId());
+            map.put("temperature", sensorReading.getTemperature().toString());
+            map.put("timestamp", sensorReading.getTimestamp().toString());
+            IndexRequest indexRequest = new IndexRequest("sensor");
+            indexRequest.source(map);
+            requestIndexer.add(indexRequest);
+        }
     }
 }
